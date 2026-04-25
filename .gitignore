@@ -1,3 +1,5 @@
 node_modules/
 database/medishop.db
+database/medishop.db-shm
+database/medishop.db-wal
 .env
