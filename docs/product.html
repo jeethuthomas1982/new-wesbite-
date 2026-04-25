@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product – MediShop</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="nav-root"></div>
+<div class="container page-content" id="main-content"></div>
+<div id="footer-root"></div>
+
+<script src="js/data.js"></script>
+<script src="js/ui.js"></script>
+<script>
+  document.getElementById('nav-root').innerHTML = renderNavbar();
+  document.getElementById('footer-root').innerHTML = renderFooter();
+  refreshCartBadge();
+
+  const pid = parseInt(new URLSearchParams(location.search).get('id'));
+  const product = MEDICINES.find(p => p.id === pid);
+  let qty = 1;
+
+  if (!product) { location.href = 'index.html'; }
+  else {
+    document.title = `${product.name} – MediShop`;
+    render();
+  }
+
+  function render() {
+    const related = MEDICINES.filter(p => p.category === product.category && p.id !== product.id).slice(0, 4);
+    document.getElementById('main-content').innerHTML = `
+      <div class="breadcrumb">
+        <a href="index.html">Home</a><span>›</span>
+        <a href="index.html?category=${encodeURIComponent(product.category)}">${product.category}</a>
+        <span>›</span><span>${product.name}</span>
+      </div>
+
+      <div class="product-detail-wrap">
+        <div class="product-detail-img">
+          <img src="${imgPath(product.image)}" alt="${product.name}"
+            onerror="this.style.display='none';document.getElementById('emoji-fb').style.display='flex'">
+          <div id="emoji-fb" style="display:none;font-size:7rem;width:100%;height:100%;align-items:center;justify-content:center">${medicineIcon(product.category)}</div>
+        </div>
+
+        <div class="product-detail-info">
+          ${product.prescription_required ? `<div style="color:#991b1b;font-size:0.82rem;font-weight:700;background:#fee2e2;padding:0.35rem 0.75rem;border-radius:4px;width:fit-content">Rx PRESCRIPTION REQUIRED</div>` : ''}
+          <h1 class="detail-name">${product.name}</h1>
+          <div class="detail-generic">${product.generic_name}</div>
+          <div class="detail-mfr">by <strong>${product.manufacturer}</strong></div>
+          <div style="height:1px;background:var(--border)"></div>
+          <div class="detail-price-block">
+            <span class="detail-price">₹${product.price.toFixed(2)}</span>
+            <span class="detail-mrp">MRP ₹${product.mrp.toFixed(2)}</span>
+            ${product.discount ? `<span class="detail-discount">${product.discount}% off</span>` : ''}
+          </div>
+          <div class="detail-pack">Pack of: <strong>${product.pack_size}</strong></div>
+          <div style="font-size:0.85rem;color:#166534;font-weight:600">✅ In Stock</div>
+
+          <div class="qty-row">
+            <div class="qty-control">
+              <button class="qty-btn" onclick="changeQty(-1)">−</button>
+              <input class="qty-num" type="number" id="qty-input" value="1" min="1" max="${product.stock}" onchange="qty=Math.max(1,parseInt(this.value)||1);this.value=qty">
+              <button class="qty-btn" onclick="changeQty(1)">+</button>
+            </div>
+            <button class="btn btn-primary btn-lg" onclick="addToCart()" id="add-cart-btn">🛒 Add to Cart</button>
+          </div>
+          <button class="btn btn-outline btn-full" onclick="buyNow()">⚡ Buy Now</button>
+
+          <div class="info-box">
+            <h4>Dosage</h4>
+            <p>${product.dosage}</p>
+          </div>
+          ${product.prescription_required ? `
+          <div class="info-box rx-warning">
+            <h4>⚠️ Prescription Required</h4>
+            <p>This medicine requires a valid prescription from a registered medical practitioner. Please upload your prescription during checkout.</p>
+          </div>` : ''}
+        </div>
+      </div>
+
+      <div style="background:white;border:1px solid var(--border);border-radius:10px;padding:1.75rem;margin-bottom:1.5rem">
+        <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:1rem">About ${product.name}</h2>
+        <p style="line-height:1.7;color:var(--text-muted)">${product.description}</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-top:1.5rem">
+          ${[['Category', product.category], ['Manufacturer', product.manufacturer], ['Pack Size', product.pack_size], ['Prescription', product.prescription_required ? 'Required' : 'Not Required']].map(([k, v]) => `
+            <div style="background:var(--bg);padding:1rem;border-radius:8px">
+              <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">${k}</div>
+              <div style="font-weight:600;margin-top:0.25rem">${v}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+
+      ${related.length ? `
+      <div class="section-header">
+        <h2 class="section-title">More in ${product.category}</h2>
+        <a class="section-link" href="index.html?category=${encodeURIComponent(product.category)}">View All →</a>
+      </div>
+      <div class="products-grid">${related.map(renderProductCard).join('')}</div>` : ''}
+    `;
+  }
+
+  function changeQty(delta) {
+    qty = Math.max(1, Math.min(product.stock, qty + delta));
+    document.getElementById('qty-input').value = qty;
+  }
+
+  function addToCart() {
+    if (!Auth.isLoggedIn()) { toast('Please login to add items to cart', 'error'); setTimeout(() => location.href = 'login.html', 1200); return; }
+    Cart.add(product.id, qty);
+    toast('Added to cart!');
+    refreshCartBadge();
+  }
+
+  function buyNow() {
+    if (!Auth.isLoggedIn()) { toast('Please login first', 'error'); setTimeout(() => location.href = 'login.html', 1200); return; }
+    Cart.add(product.id, qty);
+    location.href = 'checkout.html';
+  }
+</script>
+</body>
+</html>

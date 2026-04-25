@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediShop – Online Pharmacy</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="nav-root"></div>
+
+<section class="hero">
+  <div class="container">
+    <h1>Medicines Delivered to Your Door</h1>
+    <p>Genuine medicines at best prices. Free delivery on orders above ₹499.</p>
+    <div class="hero-pills">
+      <span class="hero-pill" onclick="filterByCategory('Pain Relief')">Pain Relief</span>
+      <span class="hero-pill" onclick="filterByCategory('Antibiotics')">Antibiotics</span>
+      <span class="hero-pill" onclick="filterByCategory('Allergy')">Allergy</span>
+      <span class="hero-pill" onclick="filterByCategory('Gastrology')">Gastrology</span>
+      <span class="hero-pill" onclick="filterByCategory('Cardiovascular')">Cardiovascular</span>
+      <span class="hero-pill" onclick="filterByCategory('Diabetes')">Diabetes</span>
+    </div>
+  </div>
+</section>
+
+<div class="container page-content">
+  <div class="filter-bar">
+    <div>
+      <label>Category</label><br>
+      <select class="filter-select" id="cat-filter" onchange="applyFilters()">
+        <option value="">All Categories</option>
+        <option>Pain Relief</option>
+        <option>Antibiotics</option>
+        <option>Allergy</option>
+        <option>Gastrology</option>
+        <option>Cardiovascular</option>
+        <option>Diabetes</option>
+      </select>
+    </div>
+    <div>
+      <label>Sort By</label><br>
+      <select class="filter-select" id="sort-filter" onchange="applyFilters()">
+        <option value="">Default</option>
+        <option value="price_asc">Price: Low to High</option>
+        <option value="price_desc">Price: High to Low</option>
+        <option value="discount">Best Discount</option>
+      </select>
+    </div>
+    <div style="margin-left:auto;align-self:flex-end">
+      <span id="product-count" style="font-size:0.85rem;color:var(--text-muted)"></span>
+    </div>
+  </div>
+
+  <div class="section-header">
+    <h2 class="section-title" id="section-title">All Medicines</h2>
+  </div>
+  <div class="products-grid" id="products-grid"></div>
+</div>
+
+<div id="footer-root"></div>
+
+<script src="js/data.js"></script>
+<script src="js/ui.js"></script>
+<script>
+  document.getElementById('nav-root').innerHTML = renderNavbar();
+  document.getElementById('footer-root').innerHTML = renderFooter();
+  refreshCartBadge();
+
+  const params = new URLSearchParams(location.search);
+  let currentCategory = params.get('category') || '';
+  let currentSearch = params.get('search') || '';
+
+  if (currentCategory) document.getElementById('cat-filter').value = currentCategory;
+  if (currentSearch) {
+    document.getElementById('section-title').textContent = `Results for "${currentSearch}"`;
+    const input = document.getElementById('nav-search-input');
+    if (input) input.value = currentSearch;
+  }
+
+  function getFiltered() {
+    const cat = document.getElementById('cat-filter').value;
+    const sort = document.getElementById('sort-filter').value;
+    let list = MEDICINES.slice();
+    if (cat) list = list.filter(p => p.category === cat);
+    if (currentSearch) {
+      const q = currentSearch.toLowerCase();
+      list = list.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.generic_name.toLowerCase().includes(q) ||
+        p.manufacturer.toLowerCase().includes(q)
+      );
+    }
+    if (sort === 'price_asc') list.sort((a, b) => a.price - b.price);
+    else if (sort === 'price_desc') list.sort((a, b) => b.price - a.price);
+    else if (sort === 'discount') list.sort((a, b) => b.discount - a.discount);
+    return list;
+  }
+
+  function applyFilters() {
+    const cat = document.getElementById('cat-filter').value;
+    currentCategory = cat;
+    const list = getFiltered();
+    renderProducts(list);
+    document.querySelectorAll('.hero-pill').forEach(p => p.classList.toggle('active', p.textContent === cat));
+    if (!currentSearch) document.getElementById('section-title').textContent = cat || 'All Medicines';
+  }
+
+  function renderProducts(list) {
+    document.getElementById('product-count').textContent = `${list.length} products found`;
+    const grid = document.getElementById('products-grid');
+    if (!list.length) {
+      grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div style="font-size:4rem">🔍</div><h3>No medicines found</h3><p>Try a different search or category</p><button class="btn btn-primary" onclick="location.href=\'index.html\'">Browse All</button></div>';
+      return;
+    }
+    grid.innerHTML = list.map(renderProductCard).join('');
+  }
+
+  function filterByCategory(cat) {
+    const filter = document.getElementById('cat-filter');
+    if (filter.value === cat) { filter.value = ''; currentCategory = ''; }
+    else { filter.value = cat; currentCategory = cat; }
+    applyFilters();
+  }
+
+  renderProducts(getFiltered());
+</script>
+</body>
+</html>
