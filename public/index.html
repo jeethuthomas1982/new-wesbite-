@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediShop – Online Pharmacy</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div id="nav-root"></div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <h1>Medicines Delivered to Your Door</h1>
+    <p>Genuine medicines at best prices. Free delivery on orders above ₹499.</p>
+    <div class="hero-pills">
+      <span class="hero-pill" onclick="filterByCategory('Pain Relief')">Pain Relief</span>
+      <span class="hero-pill" onclick="filterByCategory('Antibiotics')">Antibiotics</span>
+      <span class="hero-pill" onclick="filterByCategory('Allergy')">Allergy</span>
+      <span class="hero-pill" onclick="filterByCategory('Gastrology')">Gastrology</span>
+      <span class="hero-pill" onclick="filterByCategory('Cardiovascular')">Cardiovascular</span>
+      <span class="hero-pill" onclick="filterByCategory('Diabetes')">Diabetes</span>
+    </div>
+  </div>
+</section>
+
+<!-- MAIN CONTENT -->
+<div class="container page-content">
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <div>
+      <label>Category</label><br>
+      <select class="filter-select" id="cat-filter" onchange="applyFilters()">
+        <option value="">All Categories</option>
+      </select>
+    </div>
+    <div>
+      <label>Sort By</label><br>
+      <select class="filter-select" id="sort-filter" onchange="applyFilters()">
+        <option value="">Default</option>
+        <option value="price_asc">Price: Low to High</option>
+        <option value="price_desc">Price: High to Low</option>
+        <option value="discount">Best Discount</option>
+      </select>
+    </div>
+    <div style="margin-left:auto;align-self:flex-end">
+      <span id="product-count" style="font-size:0.85rem;color:var(--text-muted)"></span>
+    </div>
+  </div>
+
+  <!-- CATEGORY PILLS -->
+  <div class="category-pills" id="cat-pills"></div>
+
+  <!-- SECTION HEADER -->
+  <div class="section-header">
+    <h2 class="section-title" id="section-title">All Medicines</h2>
+  </div>
+
+  <!-- PRODUCTS GRID -->
+  <div class="products-grid" id="products-grid">
+    <!-- Skeleton loaders -->
+    ${Array(8).fill('<div class="product-card"><div class="product-img-wrap skeleton" style="height:160px"></div><div class="product-info"><div class="skeleton" style="height:14px;margin-bottom:6px;width:80%"></div><div class="skeleton" style="height:10px;margin-bottom:4px;width:60%"></div><div class="skeleton" style="height:10px;margin-bottom:10px;width:40%"></div><div class="skeleton" style="height:20px;margin-bottom:10px;width:50%"></div><div class="skeleton" style="height:32px"></div></div></div>').join('')}
+  </div>
+</div>
+
+<div id="footer-root"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  let currentCategory = params.get('category') || '';
+  let currentSearch = params.get('search') || '';
+
+  document.getElementById('nav-root').innerHTML = renderNavbar();
+  document.getElementById('footer-root').innerHTML = renderFooter();
+
+  async function init() {
+    const [products, categories] = await Promise.all([
+      API.products.list({ category: currentCategory, search: currentSearch }),
+      API.products.categories()
+    ]);
+
+    const catFilter = document.getElementById('cat-filter');
+    const catPills = document.getElementById('cat-pills');
+    categories.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      if (c === currentCategory) opt.selected = true;
+      catFilter.appendChild(opt);
+
+      const pill = document.createElement('span');
+      pill.className = 'cat-pill' + (c === currentCategory ? ' active' : '');
+      pill.textContent = c;
+      pill.onclick = () => filterByCategory(c);
+      catPills.appendChild(pill);
+    });
+
+    renderProducts(products);
+    if (API.isLoggedIn()) updateCartBadge();
+
+    if (currentSearch) {
+      document.getElementById('section-title').textContent = `Results for "${currentSearch}"`;
+    }
+  }
+
+  function renderProducts(products) {
+    const grid = document.getElementById('products-grid');
+    document.getElementById('product-count').textContent = `${products.length} products found`;
+    if (!products.length) {
+      grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div style="font-size:4rem">🔍</div><h3>No medicines found</h3><p>Try a different search or category</p><button class="btn btn-primary" onclick="location.href=\'/\'">Browse All</button></div>';
+      return;
+    }
+    grid.innerHTML = products.map(renderProductCard).join('');
+  }
+
+  async function applyFilters() {
+    const cat = document.getElementById('cat-filter').value;
+    const sort = document.getElementById('sort-filter').value;
+    currentCategory = cat;
+    const products = await API.products.list({ category: cat, search: currentSearch, sort });
+    renderProducts(products);
+    document.querySelectorAll('.cat-pill').forEach(p => p.classList.toggle('active', p.textContent === cat));
+    document.getElementById('section-title').textContent = cat ? cat : (currentSearch ? `Results for "${currentSearch}"` : 'All Medicines');
+  }
+
+  function filterByCategory(cat) {
+    document.getElementById('cat-filter').value = currentCategory === cat ? '' : cat;
+    currentCategory = currentCategory === cat ? '' : cat;
+    applyFilters();
+  }
+
+  init();
+</script>
+</body>
+</html>

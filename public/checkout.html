@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout – MediShop</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div id="nav-root"></div>
+
+<div class="container page-content" id="page-root">
+  <div class="skeleton" style="height:500px;border-radius:10px"></div>
+</div>
+
+<div id="footer-root"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script>
+  document.getElementById('nav-root').innerHTML = renderNavbar();
+  document.getElementById('footer-root').innerHTML = renderFooter();
+
+  let cartItems = [];
+
+  async function init() {
+    if (!API.isLoggedIn()) { location.href = '/login.html'; return; }
+
+    cartItems = await API.cart.list();
+    if (!cartItems.length) { location.href = '/cart.html'; return; }
+
+    const user = await API.auth.me();
+    renderCheckout(user);
+    updateCartBadge();
+  }
+
+  function renderCheckout(user) {
+    const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
+    const delivery = subtotal >= 499 ? 0 : 40;
+    const total = subtotal + delivery;
+    const savings = cartItems.reduce((s, i) => s + (i.mrp - i.price) * i.quantity, 0);
+
+    document.getElementById('page-root').innerHTML = `
+      <div class="breadcrumb">
+        <a href="/">Home</a><span>›</span>
+        <a href="/cart.html">Cart</a><span>›</span>
+        <span>Checkout</span>
+      </div>
+      <h1 style="font-size:1.5rem;font-weight:800;margin-bottom:1.5rem">Checkout</h1>
+
+      <div class="checkout-layout">
+        <div>
+          <!-- SHIPPING -->
+          <div class="checkout-card">
+            <h3><span class="step-num">1</span> Delivery Address</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Full Name *</label>
+                <input class="form-control" id="ship-name" placeholder="John Doe" value="${user.name || ''}" required>
+              </div>
+              <div class="form-group">
+                <label>Phone Number *</label>
+                <input class="form-control" id="ship-phone" placeholder="+91 98765 43210" value="${user.phone || ''}" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Address *</label>
+              <textarea class="form-control" id="ship-address" rows="2" placeholder="House/Flat No., Street, Area">${user.address || ''}</textarea>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>City *</label>
+                <input class="form-control" id="ship-city" placeholder="Mumbai">
+              </div>
+              <div class="form-group">
+                <label>PIN Code *</label>
+                <input class="form-control" id="ship-pincode" placeholder="400001" maxlength="6">
+              </div>
+            </div>
+          </div>
+
+          <!-- PAYMENT -->
+          <div class="checkout-card">
+            <h3><span class="step-num">2</span> Payment Method</h3>
+            <div class="payment-options">
+              <label class="payment-option">
+                <input type="radio" name="payment" value="cod" checked>
+                <div>
+                  <div class="payment-label">💵 Cash on Delivery</div>
+                  <div class="payment-sub">Pay when your order arrives</div>
+                </div>
+              </label>
+              <label class="payment-option">
+                <input type="radio" name="payment" value="upi">
+                <div>
+                  <div class="payment-label">📱 UPI Payment</div>
+                  <div class="payment-sub">Pay via PhonePe, GPay, Paytm, etc.</div>
+                </div>
+              </label>
+              <label class="payment-option">
+                <input type="radio" name="payment" value="card">
+                <div>
+                  <div class="payment-label">💳 Credit / Debit Card</div>
+                  <div class="payment-sub">Visa, Mastercard, Rupay accepted</div>
+                </div>
+              </label>
+              <label class="payment-option">
+                <input type="radio" name="payment" value="netbanking">
+                <div>
+                  <div class="payment-label">🏦 Net Banking</div>
+                  <div class="payment-sub">All major banks supported</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- PRESCRIPTION NOTE -->
+          ${cartItems.some(i => i.prescription_required) ? `
+          <div class="checkout-card" style="border-color:#fca5a5">
+            <h3 style="color:#991b1b">⚠️ Prescription Required</h3>
+            <p style="font-size:0.875rem;color:var(--text-muted);margin-bottom:0.75rem">
+              Some items in your cart require a valid prescription. Our pharmacist will contact you to collect the prescription before dispatching.
+            </p>
+            <div class="form-group">
+              <label>Upload Prescription (Optional)</label>
+              <input class="form-control" type="file" accept="image/*,.pdf" id="prescription-upload">
+            </div>
+          </div>` : ''}
+
+          <div class="form-error" id="checkout-error" style="margin-bottom:1rem"></div>
+          <button class="btn btn-primary btn-full btn-lg" onclick="placeOrder()" id="place-order-btn">
+            🛍️ Place Order · ₹${total.toFixed(2)}
+          </button>
+        </div>
+
+        <!-- ORDER SUMMARY -->
+        <div>
+          <div class="checkout-card" style="position:sticky;top:80px">
+            <h3>Order Summary (${cartItems.length} items)</h3>
+            <div style="margin-bottom:1rem">
+              ${cartItems.map(item => `
+                <div class="order-review-item">
+                  <div class="order-review-img">
+                    <img src="/images/${item.image}" alt="${item.name}"
+                      onerror="this.style.display='none';this.parentElement.innerHTML='💊'">
+                  </div>
+                  <div style="flex:1">
+                    <div class="order-review-name">${item.name}</div>
+                    <div class="order-review-qty">${item.pack_size} × ${item.quantity}</div>
+                  </div>
+                  <div class="order-review-price">₹${(item.price * item.quantity).toFixed(2)}</div>
+                </div>
+              `).join('')}
+            </div>
+            <div class="summary-row"><span>Subtotal</span><span>₹${subtotal.toFixed(2)}</span></div>
+            <div class="summary-row"><span>Delivery</span><span>${delivery === 0 ? '<strong style="color:#166534">FREE</strong>' : '₹' + delivery.toFixed(2)}</span></div>
+            ${savings > 0 ? `<div class="summary-row" style="color:#166534"><span>Savings</span><span>-₹${savings.toFixed(2)}</span></div>` : ''}
+            <div class="summary-row total"><span>Total</span><span>₹${total.toFixed(2)}</span></div>
+
+            <div style="margin-top:1rem;font-size:0.8rem;color:var(--text-muted);text-align:center">
+              🔒 Secure checkout · 100% genuine medicines
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  async function placeOrder() {
+    const name = document.getElementById('ship-name')?.value?.trim();
+    const phone = document.getElementById('ship-phone')?.value?.trim();
+    const address = document.getElementById('ship-address')?.value?.trim();
+    const city = document.getElementById('ship-city')?.value?.trim();
+    const pincode = document.getElementById('ship-pincode')?.value?.trim();
+    const payment = document.querySelector('input[name="payment"]:checked')?.value || 'cod';
+    const errEl = document.getElementById('checkout-error');
+
+    errEl.textContent = '';
+    if (!name || !address || !city || !pincode) {
+      errEl.textContent = 'Please fill in all required shipping details.';
+      errEl.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+    if (!/^\d{6}$/.test(pincode)) { errEl.textContent = 'Please enter a valid 6-digit PIN code.'; return; }
+
+    const btn = document.getElementById('place-order-btn');
+    btn.disabled = true;
+    btn.textContent = 'Placing Order...';
+
+    try {
+      const data = await API.orders.place({
+        payment_method: payment,
+        shipping_name: name,
+        shipping_phone: phone,
+        shipping_address: address,
+        shipping_city: city,
+        shipping_pincode: pincode,
+      });
+      showOrderSuccess(data.order_id, data.total, payment);
+      updateCartBadge();
+    } catch (e) {
+      errEl.textContent = e.message;
+      btn.disabled = false;
+      btn.textContent = `🛍️ Place Order`;
+    }
+  }
+
+  function showOrderSuccess(orderId, total, payment) {
+    document.getElementById('page-root').innerHTML = `
+      <div class="order-success">
+        <div class="check-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+        </div>
+        <h2>Order Placed Successfully!</h2>
+        <p>Your order #${orderId} has been placed. You'll receive a confirmation shortly.</p>
+
+        <div style="background:white;border:1px solid var(--border);border-radius:10px;padding:1.5rem;max-width:380px;margin:0 auto 2rem;text-align:left">
+          <div class="summary-row"><span>Order ID</span><span><strong>#${orderId}</strong></span></div>
+          <div class="summary-row"><span>Amount Paid</span><span><strong>₹${total.toFixed(2)}</strong></span></div>
+          <div class="summary-row"><span>Payment Method</span><span>${payment.toUpperCase()}</span></div>
+          <div class="summary-row"><span>Estimated Delivery</span><span>2-4 business days</span></div>
+        </div>
+
+        <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+          <a href="/" class="btn btn-primary btn-lg">Continue Shopping</a>
+          <a href="/" class="btn btn-outline btn-lg">View Orders</a>
+        </div>
+      </div>
+    `;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  init();
+</script>
+</body>
+</html>
